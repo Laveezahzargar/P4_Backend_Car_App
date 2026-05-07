@@ -41,6 +41,18 @@ namespace P4_Backend_Car_App.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] EngineCapacity e)
         {
+            e.Name = e.Name.Trim();
+            e.Capacity = e.Capacity.Trim();
+
+            bool exists = await _context.EngineCapacities
+           .AnyAsync(x =>
+             (x.Name.ToLower() == e.Name.ToLower()
+            || x.Capacity.ToLower() == e.Capacity.ToLower()));
+
+            if (exists)
+            {
+                return BadRequest("Engine name or capacity already exists");
+            }
             _context.EngineCapacities.Add(e);
             await _context.SaveChangesAsync();
 
@@ -55,6 +67,20 @@ namespace P4_Backend_Car_App.Controllers
 
             if (existing == null)
                 return NotFound();
+
+            e.Name = e.Name.Trim();
+            e.Capacity = e.Capacity.Trim();
+
+            bool exists = await _context.EngineCapacities
+           .AnyAsync(x =>
+             (x.Name.ToLower() == e.Name.ToLower()
+            || x.Capacity.ToLower() == e.Capacity.ToLower())
+            && x.Id != id);
+
+            if (exists)
+            {
+                return BadRequest("Engine name or capacity already exists");
+            }
 
             // update fields
             existing.Name = e.Name;

@@ -48,12 +48,25 @@ namespace P4_Backend_Car_App.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Car car)
         {
+            car.Name = car.Name.Trim();
+
             // validate foreign keys
             var manufacturerExists = await _context.Manufacturers.AnyAsync(m => m.Id == car.ManufacturerId);
             var engineExists = await _context.EngineCapacities.AnyAsync(e => e.Id == car.EngineCapacityId);
 
             if (!manufacturerExists || !engineExists)
                 return BadRequest("Invalid ManufacturerId or EngineCapacityId");
+
+            bool exists = await _context.Cars.AnyAsync(c =>
+            c.Name.ToLower() == car.Name.ToLower()
+            && c.ManufacturerId == car.ManufacturerId
+            && c.Year == car.Year);
+
+            if (exists)
+            {
+                return BadRequest("Car already exists.");
+
+            }
 
             _context.Cars.Add(car);
             await _context.SaveChangesAsync();
@@ -70,6 +83,18 @@ namespace P4_Backend_Car_App.Controllers
             if (existing == null)
                 return NotFound();
 
+            car.Name = car.Name.Trim();
+
+            bool exists = await _context.Cars.AnyAsync(c =>
+            c.Name.ToLower() == car.Name.ToLower()
+            && c.ManufacturerId == car.ManufacturerId
+            && c.Year == car.Year
+            && c.Id != id);
+
+            if (exists)
+            {
+                return BadRequest("Car already exists.");
+            }
             // update fields
             existing.Name = car.Name;
             existing.ManufacturerId = car.ManufacturerId;

@@ -37,6 +37,15 @@ namespace P4_Backend_Car_App.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody]Manufacturer m)
         {
+            m.Name = m.Name.Trim();
+
+            bool exists = await _context.Manufacturers
+                .AnyAsync(x => x.Name.ToLower() == m.Name.ToLower());
+
+            if (exists)
+            {
+                return BadRequest("Manufacturer already exists");
+            }
             _context.Manufacturers.Add(m);
             await _context.SaveChangesAsync();
             return Ok(m);
@@ -51,6 +60,17 @@ namespace P4_Backend_Car_App.Controllers
             if (existing == null)
                 return NotFound();
 
+            m.Name = m.Name.Trim();
+
+            bool exists = await _context.Manufacturers
+                .AnyAsync(x =>
+                    x.Name.ToLower() == m.Name.ToLower()
+                    && x.Id != id);
+
+            if (exists)
+            {
+                return BadRequest("Manufacturer already exists");
+            }
             // update only what you need
             existing.Name = m.Name;
             existing.Description = m.Description;
