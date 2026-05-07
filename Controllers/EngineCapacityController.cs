@@ -70,12 +70,20 @@ namespace P4_Backend_Car_App.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var item = await _context.EngineCapacities.FindAsync(id);
+            var engine = await _context.EngineCapacities
+                .Include(e => e.Cars)
+                .FirstOrDefaultAsync(e => e.Id == id);
 
-            if (item == null)
+            if (engine == null)
                 return NotFound();
 
-            _context.EngineCapacities.Remove(item);
+            if (engine.Cars != null && engine.Cars.Any())
+            {
+                return BadRequest("Cannot delete engine capacity because it is linked to cars.");
+            }
+
+            _context.EngineCapacities.Remove(engine);
+
             await _context.SaveChangesAsync();
 
             return Ok();

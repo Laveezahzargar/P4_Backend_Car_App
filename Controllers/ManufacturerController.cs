@@ -64,10 +64,20 @@ namespace P4_Backend_Car_App.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var item = await _context.Manufacturers.FindAsync(id);
-            if (item == null) return NotFound();
+            var manufacturer = await _context.Manufacturers
+                .Include(m => m.Cars)
+                .FirstOrDefaultAsync(m => m.Id == id);
 
-            _context.Manufacturers.Remove(item);
+            if (manufacturer == null)
+                return NotFound();
+
+            if (manufacturer.Cars != null && manufacturer.Cars.Any())
+            {
+                return BadRequest("Cannot delete manufacturer because it is linked to cars.");
+            }
+
+            _context.Manufacturers.Remove(manufacturer);
+
             await _context.SaveChangesAsync();
 
             return Ok();
