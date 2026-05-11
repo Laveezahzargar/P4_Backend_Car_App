@@ -142,7 +142,7 @@ namespace P4_Backend_Car_App.Controllers
 
         // PUT: api/Cars/1
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] CarCreateUpdateDto car)
+        public async Task<IActionResult> Update(int id, [FromForm] CarCreateUpdateDto car)
         {
             var existing = await _context.Cars.FindAsync(id);
 
