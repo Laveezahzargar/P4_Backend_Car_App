@@ -21,5 +21,7 @@ namespace P4_Backend_Car_App.Models
         public decimal Price { get; set; }
 
         public int Year { get; set; }
+
+        public string? ImageUrl { get; set; }
     }
 }

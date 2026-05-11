@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
 using Microsoft.EntityFrameworkCore;
+using P4_Backend_Car_App.DTOs;
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -21,25 +22,41 @@ namespace P4_Backend_Car_App.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var data = await _context.EngineCapacities.ToListAsync();
-            return Ok(data);
+            var data = await _context.EngineCapacities
+                .Select(e => new EngineCapacityDto
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    Description = e.Description,
+                    Capacity = e.Capacity
+                }).ToListAsync();
+            return Ok(new { statusCode = 200, message = "Engines retrieved successfully", data = data });
         }
 
         // GET: api/EngineCapacities/1
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var item = await _context.EngineCapacities.FindAsync(id);
+            var item = await _context.EngineCapacities
+               .Where(e => e.Id == id)
+               .Select(e => new EngineCapacityDto
+                    {
+                        Id = e.Id,
+                        Name = e.Name,
+                        Description = e.Description,
+                        Capacity = e.Capacity
+                    })
+               .FirstOrDefaultAsync();
 
             if (item == null)
                 return NotFound();
 
-            return Ok(item);
+            return Ok(new { statusCode = 200, message = "Engine retrieved successfully", data = item });
         }
 
         // POST: api/EngineCapacities
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] EngineCapacity e)
+        public async Task<IActionResult> Create([FromBody] EngineCreateUpdateDto e)
         {
             e.Name = e.Name.Trim();
             e.Capacity = e.Capacity.Trim();
@@ -53,15 +70,21 @@ namespace P4_Backend_Car_App.Controllers
             {
                 return BadRequest("Engine name or capacity already exists");
             }
-            _context.EngineCapacities.Add(e);
+            var engine = new EngineCapacity
+            {
+                Name = e.Name,
+                Capacity = e.Capacity,
+                Description = e.Description
+            };
+            _context.EngineCapacities.Add(engine);
             await _context.SaveChangesAsync();
 
-            return Ok(e);
+            return Ok(new { statusCode = 201, message = "Engine Added successfully", data = engine.Id });
         }
 
         // PUT: api/EngineCapacities/1
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] EngineCapacity e)
+        public async Task<IActionResult> Update(int id, [FromBody] EngineCreateUpdateDto e)
         {
             var existing = await _context.EngineCapacities.FindAsync(id);
 
@@ -89,7 +112,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(existing);
+            return Ok(new { statusCode = 200, message = "Engine updated successfully",data= existing.Id });
         }
 
         // DELETE: api/EngineCapacities/1
@@ -112,7 +135,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return Ok(new {statusCode=200, message = "Engine deleted successfully",data= engine.Id });
         }
     }
 }

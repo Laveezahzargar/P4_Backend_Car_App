@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
+using P4_Backend_Car_App.DTOs;
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -21,21 +22,40 @@ namespace P4_Backend_Car_App.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            return Ok(await _context.Manufacturers.ToListAsync());
+            var manufacturers = await _context.Manufacturers
+            .Select(m => new ManufacturerDto
+            {
+                Id = m.Id,
+                Name = m.Name,
+                Description = m.Description
+            })
+            .ToListAsync();
+            return Ok(new { statusCode = 200, message = "Manufacturers retrieved successfully", data = manufacturers });
         }
 
         // GET: api/manufacturers/1
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var item = await _context.Manufacturers.FindAsync(id);
-            if (item == null) return NotFound();
-            return Ok(item);
+            var manufacturer = await _context.Manufacturers
+            .Where(m => m.Id == id)
+            .Select(m => new ManufacturerDto
+            {
+                Id = m.Id,
+                Name = m.Name,
+                Description = m.Description
+            })
+            .FirstOrDefaultAsync();
+
+            if (manufacturer == null)
+                return NotFound();
+
+            return Ok(new { statusCode = 200, message = "Manufacturer retrieved successfully", data = manufacturer });
         }
 
         // POST: api/manufacturers
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody]Manufacturer m)
+        public async Task<IActionResult> Create([FromBody] ManufacturerCreateUpdateDto m)
         {
             m.Name = m.Name.Trim();
 
@@ -46,14 +66,19 @@ namespace P4_Backend_Car_App.Controllers
             {
                 return BadRequest("Manufacturer already exists");
             }
-            _context.Manufacturers.Add(m);
+            var manufacturer = new Manufacturer
+            {
+                Name = m.Name,
+                Description = m.Description
+            };
+            _context.Manufacturers.Add(manufacturer);
             await _context.SaveChangesAsync();
-            return Ok(m);
+            return Ok(new { statusCode = 201, message = "Manufacturer added successfully", data = manufacturer.Id });
         }
 
         // PUT: api/manufacturers/1
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Manufacturer m)
+        public async Task<IActionResult> Update(int id, [FromBody] ManufacturerCreateUpdateDto m)
         {
             var existing = await _context.Manufacturers.FindAsync(id);
 
@@ -77,7 +102,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(existing);
+            return Ok(new { statusCode = 200, message = "Manufacturer updated successfully", data = existing.Id });
         }
 
         // DELETE: api/manufacturers/1
@@ -100,7 +125,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return Ok(new { statusCode = 200, message = "Manufacturer deleted successfully", data = manufacturer.Id });
         }
     }
 }

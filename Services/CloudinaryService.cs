@@ -1,0 +1,47 @@
+
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
+using Microsoft.AspNetCore.Http;
+using P4_Backend_Car_App.Interfaces;
+
+namespace P4_Backend_Car_App.Services;
+
+public class CloudinaryService :ICloudinaryService
+{
+    private readonly Cloudinary cloudinary;
+
+    public CloudinaryService(string cloudinaryUrl)
+    {
+
+        this.cloudinary = new Cloudinary(cloudinaryUrl);
+
+        cloudinary.Api.Secure = true;
+    }
+    public async Task<string> UploadImageAsync(IFormFile image, string folderName)
+    {
+        if (image == null || image.Length == 0)
+        {
+            throw new ArgumentNullException("File is null");
+        }
+
+        using var stream = image.OpenReadStream();
+
+
+        var uploadParams = new ImageUploadParams()
+        {
+
+            File = new FileDescription(image.FileName, stream),
+            UseFilename = true,
+            UniqueFilename = false,
+            Overwrite = true,
+            Folder = folderName
+        };
+
+        var uploadResult = await cloudinary.UploadAsync(uploadParams);
+
+        return uploadResult.SecureUrl.ToString();
+
+
+
+    }
+}

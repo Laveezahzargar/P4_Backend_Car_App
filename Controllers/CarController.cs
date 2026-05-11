@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
 using Microsoft.EntityFrameworkCore;
+using P4_Backend_Car_App.DTOs;
+using P4_Backend_Car_App.Services;
+using P4_Backend_Car_App.Interfaces;
+using P4_Backend_Car_App.Types;
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -11,10 +15,12 @@ namespace P4_Backend_Car_App.Controllers
     public class CarController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public CarController(AppDbContext context)
+        public CarController(AppDbContext context, ICloudinaryService cloudinaryService)
         {
             _context = context;
+            _cloudinaryService = cloudinaryService;
         }
 
         // GET: api/Cars
@@ -24,9 +30,27 @@ namespace P4_Backend_Car_App.Controllers
             var cars = await _context.Cars
                 .Include(c => c.Manufacturer)
                 .Include(c => c.EngineCapacity)
+                .Select(c => new CarDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+
+                    ManufacturerId = c.ManufacturerId,
+                    Manufacturer = c.Manufacturer.Name,
+
+                    EngineCapacityId = c.EngineCapacityId,
+                    EngineCapacity = c.EngineCapacity.Capacity,
+
+                    FuelType = c.FuelType.ToString(),
+                    Transmission = c.Transmission.ToString(),
+
+                    Price = c.Price,
+                    Year = c.Year,
+                    ImageUrl = c.ImageUrl
+                })
                 .ToListAsync();
 
-            return Ok(cars);
+            return Ok(new { statusCode = 200, message = "Cars retrieved successfully", data = cars });
         }
 
         // GET: api/Cars/1
@@ -36,17 +60,37 @@ namespace P4_Backend_Car_App.Controllers
             var car = await _context.Cars
                 .Include(c => c.Manufacturer)
                 .Include(c => c.EngineCapacity)
-                .FirstOrDefaultAsync(c => c.Id == id);
+                .Where(c => c.Id == id)
+               .Select(c => new CarDto
+               {
+                   Id = c.Id,
+                   Name = c.Name,
+
+                   ManufacturerId = c.ManufacturerId,
+                   Manufacturer = c.Manufacturer.Name,
+
+                   EngineCapacityId = c.EngineCapacityId,
+                   EngineCapacity = c.EngineCapacity.Capacity,
+
+                   FuelType = c.FuelType.ToString(),        // ✅ FIXED
+                   Transmission = c.Transmission.ToString(),
+
+                   Price = c.Price,
+                   Year = c.Year,
+
+                   ImageUrl = c.ImageUrl
+               })
+                .FirstOrDefaultAsync();
 
             if (car == null)
                 return NotFound();
 
-            return Ok(car);
+            return Ok(new { statusCode = 200, message = "Car retrieved successfully", data = car });
         }
 
         // POST: api/Cars
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] Car car)
+        public async Task<IActionResult> Create([FromForm] CarCreateWithImageDto car)
         {
             car.Name = car.Name.Trim();
 
@@ -67,16 +111,38 @@ namespace P4_Backend_Car_App.Controllers
                 return BadRequest("Car already exists.");
 
             }
+            string imageUrl = "";
 
-            _context.Cars.Add(car);
+            if (car.Image != null)
+            {
+                imageUrl = await _cloudinaryService
+                    .UploadImageAsync(car.Image, "cars");
+            }
+
+            var newCar = new Car
+            {
+                Name = car.Name,
+                ManufacturerId = car.ManufacturerId,
+                EngineCapacityId = car.EngineCapacityId,
+
+                FuelType = Enum.Parse<FuelType>(car.FuelType),
+                Transmission = Enum.Parse<Transmission>(car.Transmission),
+
+                Price = car.Price,
+                Year = car.Year,
+
+                ImageUrl = imageUrl   // ✅ FIXED
+            };
+
+            _context.Cars.Add(newCar);
             await _context.SaveChangesAsync();
 
-            return Ok(car);
+            return Ok(new { statusCode = 200, message = "Car added successfully", data = newCar.Id });
         }
 
         // PUT: api/Cars/1
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Car car)
+        public async Task<IActionResult> Update(int id, [FromBody] CarCreateUpdateDto car)
         {
             var existing = await _context.Cars.FindAsync(id);
 
@@ -106,7 +172,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(existing);
+            return Ok(new { statusCode = 200, message = "Car updated successfully", data = existing.Id });
         }
 
         // DELETE: api/Cars/1
@@ -121,7 +187,17 @@ namespace P4_Backend_Car_App.Controllers
             _context.Cars.Remove(car);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return Ok(new { statusCode = 200, message = "Car deleted successfully", data = car.Id });
+        }
+
+        //upload image for a car
+        [HttpPost("upload")]
+        public async Task<IActionResult> UploadImage([FromForm]IFormFile file)
+        {
+            var imageUrl = await _cloudinaryService
+                .UploadImageAsync(file, "cars");
+
+            return Ok(imageUrl);
         }
     }
 }
