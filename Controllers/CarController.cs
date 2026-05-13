@@ -170,6 +170,12 @@ namespace P4_Backend_Car_App.Controllers
             existing.Price = car.Price;
             existing.Year = car.Year;
 
+            if (car.ImageUrl != null)
+            {
+                existing.ImageUrl = await _cloudinaryService
+                    .UploadImageAsync(car.ImageUrl, "cars");
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(new { statusCode = 200, message = "Car updated successfully", data = existing.Id });

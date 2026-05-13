@@ -19,4 +19,6 @@ public class CarCreateUpdateDto
     public decimal Price { get; set; }
 
     public int Year { get; set; }
+
+    public IFormFile? ImageUrl { get; set; }
 }
