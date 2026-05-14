@@ -10,6 +10,7 @@ namespace P4_Backend_Car_App.Data
         public DbSet<Manufacturer> Manufacturers { get; set; }
         public DbSet<EngineCapacity> EngineCapacities { get; set; }
         public DbSet<Car> Cars { get; set; }
+        public DbSet<User> Users { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options) { }
