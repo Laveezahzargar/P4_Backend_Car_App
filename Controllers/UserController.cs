@@ -54,37 +54,54 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { statusCode = 200, message = "User added successfully", data = user.Id });
+            return Ok(new { statusCode = 200, message = "user added sucessfully.", data = user.Id });
         }
 
         // READ ALL
         [HttpGet]
         public async Task<IActionResult> GetAllUsers()
         {
-            var users =
-                await _context.Users.ToListAsync();
+            var users = await _context.Users
+                .Select(x => new UserResponseDto
+                {
+                    Id = x.Id,
+                    FullName = x.FullName,
+                    Email = x.Email,
+                    Username = x.Username,
+                    CreatedAt = x.CreatedAt
+                })
+                .ToListAsync();
 
-            return Ok(new { statusCode = 200, message = "Users retrieved successfully", data = users});
+            return Ok(new { statusCode = 200, message = "users retrieved sucessfully.", data = users });
         }
 
         // READ BY ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUser(int id)
         {
-            var user =
-                await _context.Users.FindAsync(id);
+            var user = await _context.Users
+                .Where(x => x.Id == id)
+                .Select(x => new UserResponseDto
+                {
+                    Id = x.Id,
+                    FullName = x.FullName,
+                    Email = x.Email,
+                    Username = x.Username,
+                    CreatedAt = x.CreatedAt
+                })
+                .FirstOrDefaultAsync();
 
             if (user == null)
             {
                 return NotFound();
             }
 
-            return Ok(new { statusCode = 200, message = "user retrieved successfully", data = user });
+            return Ok(new { statusCode = 200, message = "user retrieved sucessfully.", data = user });
         }
 
         // UPDATE
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(int id,[FromForm] UserDto dto)
+        public async Task<IActionResult> UpdateUser(int id,[FromForm] UserUpdateDto dto)
         {
             var user =
                 await _context.Users.FindAsync(id);
@@ -107,7 +124,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { statusCode = 200, message = "user updated successfully", data = user.Id });
+            return Ok(new { statusCode = 200, message = "user updated sucessfully.", data = user.Id });
         }
 
         // DELETE
@@ -126,7 +143,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { statusCode = 200, message = "user deleted successfully", data = user.Id });
+            return Ok(new { statusCode = 200, message = "user deleted sucessfully.", data = user.Id });
         }
 
         //Login
