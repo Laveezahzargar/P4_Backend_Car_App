@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using P4_Backend_Car_App.Types;
 
 namespace P4_Backend_Car_App.Services
 {
@@ -15,7 +16,7 @@ namespace P4_Backend_Car_App.Services
             _secretKey = SecretKey;
         }
 
-        public string CreateToken(int userId, string email, string username, int time)
+        public string CreateToken(int userId, string email, string username, Role role, int time)
         {
             var tokenHandler = new JwtSecurityTokenHandler();   // intializing new instance of  JwtSecurityTokenHandler
 
@@ -26,8 +27,9 @@ namespace P4_Backend_Car_App.Services
                 Subject = new ClaimsIdentity(
                 [
                     new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-                new Claim(ClaimTypes.Email, email),
-                new Claim(ClaimTypes.Name, username)
+                    new Claim(ClaimTypes.Email, email),
+                    new Claim(ClaimTypes.Name, username),
+                    new Claim(ClaimTypes.Role, role.ToString())
                 ]),
 
                 Expires = DateTime.UtcNow.AddMinutes(time),
@@ -38,8 +40,6 @@ namespace P4_Backend_Car_App.Services
             var token = tokenHandler.CreateToken(payload);     // creation of token 
             return tokenHandler.WriteToken(token);        // returning of token 
         }
-
-
 
         public int VerifyTokenAndGetId(string token)
         {

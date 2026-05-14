@@ -1,5 +1,7 @@
 
 using System.ComponentModel.DataAnnotations;
+using P4_Backend_Car_App.Types;
+using Role = P4_Backend_Car_App.Types.Role;
 
 
 namespace P4_Backend_Car_App.Models
@@ -24,6 +26,8 @@ namespace P4_Backend_Car_App.Models
         [Required]
         public string PasswordHash { get; set; }
 
+        [Required]
+        public  Role Role { get; set; }
         public DateTime CreatedAt { get; set; }
             = DateTime.UtcNow;
     }

@@ -179,7 +179,7 @@ namespace P4_Backend_Car_App.Controllers
                     });
             }
 
-            var token = _tokenService.CreateToken(user.Id, user.Email, user.Username, 60 * 24);
+            var token = _tokenService.CreateToken(user.Id, user.Email, user.Username, user.Role, 60 * 24);
 
             var cookieOptions = new CookieOptions
             {
