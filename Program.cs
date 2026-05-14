@@ -19,6 +19,12 @@ builder.Services.AddScoped<ICloudinaryService>(x =>
         builder.Configuration["Cloudinary:CloudinaryUrl"]
     )
 );
+
+builder.Services.AddScoped<ITokenService>(x =>
+    new TokenService(
+        builder.Configuration["Jwt:SecretKey"]
+    ));
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

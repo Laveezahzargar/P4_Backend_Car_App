@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.DTOs;
+using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Models;
+using P4_Backend_Car_App.Services;
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -13,10 +15,12 @@ namespace P4_Backend_Car_App.Controllers
     public class UserController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly ITokenService _tokenService;
 
-        public UserController(AppDbContext context)
+        public UserController(AppDbContext context,ITokenService tokenService)
         {
             _context = context;
+            _tokenService = tokenService;
         }
 
         // CREATE
@@ -158,6 +162,23 @@ namespace P4_Backend_Car_App.Controllers
                     });
             }
 
+            var token = _tokenService.CreateToken(user.Id, user.Email, user.Username, 60 * 24);
+
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Strict,
+
+                Expires = DateTime.UtcNow.AddDays(1)
+            };
+
+            // SAVE TOKEN IN COOKIE
+            Response.Cookies.Append(
+                "car_app_token",
+                token,
+                cookieOptions);
+
             return Ok(
                 new
                 {
@@ -166,9 +187,7 @@ namespace P4_Backend_Car_App.Controllers
                     data = new
                     {
                         user.Id,
-                        user.FullName,
-                        user.Email,
-                        user.Username
+                        user.FullName
                     }
                 });
         }
