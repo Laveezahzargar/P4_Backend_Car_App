@@ -54,6 +54,22 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync();
 
+            var token = _tokenService.CreateToken(user.Id, user.Email, user.Username, user.Role, 60 * 24);
+
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Strict,
+
+                Expires = DateTime.UtcNow.AddDays(1)
+            };
+
+            Response.Cookies.Append(
+               "car_app_token",
+               token,
+               cookieOptions);
+
             return Ok(new { statusCode = 200, message = "user added sucessfully.", data = user.Id });
         }
 

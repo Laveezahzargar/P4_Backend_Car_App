@@ -112,12 +112,12 @@ namespace P4_Backend_Car_App.Controllers
 
             }
             string imageUrl = "";
-
-            if (car.Image != null)
+            if (car.Image == null || car.Image.Length == 0)
             {
-                imageUrl = await _cloudinaryService
-                    .UploadImageAsync(car.Image, "cars");
+                return BadRequest("Image field is required.");
             }
+            imageUrl = await _cloudinaryService
+               .UploadImageAsync(car.Image, "cars");
 
             var newCar = new Car
             {
@@ -170,11 +170,14 @@ namespace P4_Backend_Car_App.Controllers
             existing.Price = car.Price;
             existing.Year = car.Year;
 
-            if (car.ImageUrl != null)
+            // update image
+            if (car.Image != null)
             {
-                existing.ImageUrl = await _cloudinaryService
-                    .UploadImageAsync(car.ImageUrl, "cars");
+                existing.ImageUrl =
+                    await _cloudinaryService
+                        .UploadImageAsync(car.Image, "cars");
             }
+
 
             await _context.SaveChangesAsync();
 

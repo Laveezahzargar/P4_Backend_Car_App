@@ -20,5 +20,5 @@ public class CarCreateUpdateDto
 
     public int Year { get; set; }
 
-    public IFormFile? ImageUrl { get; set; }
+    public IFormFile? Image { get; set; }
 }
