@@ -3,6 +3,7 @@ using P4_Backend_Car_App.Data;
 using System.Text.Json.Serialization;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Services;
+using P4_Backend_Car_App.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<Authorize>();
 
 app.UseAuthorization();
 

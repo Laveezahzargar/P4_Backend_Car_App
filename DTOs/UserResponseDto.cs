@@ -1,4 +1,7 @@
-﻿namespace P4_Backend_Car_App.DTOs
+﻿
+using P4_Backend_Car_App.Types;
+
+namespace P4_Backend_Car_App.DTOs
 {
     public class UserResponseDto
     {
@@ -9,6 +12,8 @@
         public string Email { get; set; }
 
         public string Username { get; set; }
+
+        public Role Role { get; set; }
 
         public DateTime CreatedAt { get; set; }
     }

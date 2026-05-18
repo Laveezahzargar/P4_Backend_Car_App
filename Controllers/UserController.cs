@@ -84,6 +84,7 @@ namespace P4_Backend_Car_App.Controllers
                     FullName = x.FullName,
                     Email = x.Email,
                     Username = x.Username,
+                    Role=x.Role,
                     CreatedAt = x.CreatedAt
                 })
                 .ToListAsync();
@@ -219,8 +220,8 @@ namespace P4_Backend_Car_App.Controllers
                     message = "Login successful",
                     data = new
                     {
-                        user.Id,
-                        user.FullName
+                        username= user.Username,
+                        role=user.Role
                     }
                 });
         }
