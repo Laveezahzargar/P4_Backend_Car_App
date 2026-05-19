@@ -1,5 +1,6 @@
 
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.Data;
@@ -7,6 +8,7 @@ using P4_Backend_Car_App.DTOs;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Models;
 using P4_Backend_Car_App.Services;
+using P4_Backend_Car_App.Middlewares;
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -225,6 +227,33 @@ namespace P4_Backend_Car_App.Controllers
                         role=user.Role
                     }
                 });
+        }
+        [HttpPost("CreateOrder/{carId}")]
+        public async Task<IActionResult> CreateOrder(int carId)
+        {
+            var userIdClaim = User.FindFirst("id")?.Value;
+
+            if (userIdClaim == null)
+                return Unauthorized();
+
+            int userId = int.Parse(userIdClaim);
+
+            var car = await _context.Cars.FindAsync(carId);
+
+            if (car == null)
+                return NotFound("Car not found");
+
+            var order = new Order
+            {
+                UserId = userId,
+                CarId = carId,
+                Price = car.Price
+            };
+
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            return Ok(new {statusCode=200,message="Order Created Sucessfully.", data=order});
         }
     }
 }
