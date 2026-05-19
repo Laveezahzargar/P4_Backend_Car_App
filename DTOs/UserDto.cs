@@ -1,4 +1,4 @@
-
+using P4_Backend_Car_App.Types;
 
 namespace P4_Backend_Car_App.DTOs
 {
@@ -11,5 +11,7 @@ namespace P4_Backend_Car_App.DTOs
         public string Username { get; set; }
 
         public string Password { get; set; }
+
+        public Role Role { get; set; } = Role.Customer;
     }
 }

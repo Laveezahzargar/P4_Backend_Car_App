@@ -43,6 +43,7 @@ namespace P4_Backend_Car_App.Controllers
                 FullName = dto.FullName,
                 Email = dto.Email,
                 Username = dto.Username,
+                Role= dto.Role,
 
                 // HASH PASSWORD
                 PasswordHash =
@@ -70,7 +71,7 @@ namespace P4_Backend_Car_App.Controllers
                token,
                cookieOptions);
 
-            return Ok(new { statusCode = 200, message = "user added sucessfully.", data = user.Id });
+            return Ok(new { statusCode = 200, message = "user added sucessfully.", data = user.Role });
         }
 
         // READ ALL
