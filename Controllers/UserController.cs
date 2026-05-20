@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.Data;
-using P4_Backend_Car_App.DTOs;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Models;
-using P4_Backend_Car_App.Services;
-using P4_Backend_Car_App.Middlewares;
+using P4_Backend_Car_App.Types;
+using Microsoft.AspNetCore.RateLimiting;
+using P4_Backend_Car_App.DTOs.User;
+
+
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -18,6 +20,7 @@ namespace P4_Backend_Car_App.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ITokenService _tokenService;
+        private const string AuthCookieName = "car_app_token";
 
         public UserController(AppDbContext context,ITokenService tokenService)
         {
@@ -25,235 +28,373 @@ namespace P4_Backend_Car_App.Controllers
             _tokenService = tokenService;
         }
 
-        // CREATE
+        // CREATE USER
+        [EnableRateLimiting("registerPolicy")]
         [HttpPost]
-        public async Task<IActionResult> CreateUser([FromForm] UserDto dto)
+        public async Task<IActionResult> CreateUser([FromBody] RegisterDto dto, CancellationToken ct)
         {
-            // check username
-            bool exists =
-                await _context.Users.AnyAsync(
-                    x => x.Username == dto.Username);
+            ct.ThrowIfCancellationRequested();
+
+            var username = dto.Username.Trim();
+            var email = dto.Email.Trim();
+
+            var normalizedUsername = username.ToUpper();
+            var normalizedEmail = email.ToUpper();
+
+            bool exists = await _context.Users.AnyAsync(
+                x => x.NormalizedUsername == normalizedUsername ||
+                     x.NormalizedEmail == normalizedEmail, ct);
 
             if (exists)
             {
-                return BadRequest(
-                    "Username already exists");
+                return BadRequest(new { message = "Username or Email already exists" });
             }
 
-            User user = new User
+            if (dto.Password.Length < 8 ||
+                !dto.Password.Any(char.IsUpper) ||
+                !dto.Password.Any(char.IsDigit))
             {
-                FullName = dto.FullName,
-                Email = dto.Email,
-                Username = dto.Username,
-                Role= dto.Role,
+                return BadRequest(new
+                {
+                    message = "Password must be 8+ chars, include uppercase and number"
+                });
+            }
 
-                // HASH PASSWORD
-                PasswordHash =
-                    BCrypt.Net.BCrypt.HashPassword(
-                        dto.Password)
+            var user = new User
+            {
+                FullName = dto.FullName.Trim(),
+                Email = email,
+                Username = username,
+                NormalizedEmail = normalizedEmail,
+                NormalizedUsername = normalizedUsername,
+                Role = Role.Customer,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
             };
 
             _context.Users.Add(user);
 
-            await _context.SaveChangesAsync();
-
-            var token = _tokenService.CreateToken(user.Id, user.Email, user.Username, user.Role, 60 * 24);
-
-            var cookieOptions = new CookieOptions
+            try
             {
-                HttpOnly = true,
-                Secure = false,
-                SameSite = SameSiteMode.Strict,
+                await _context.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                return BadRequest(new { message = "Username or Email already exists" });
+            }
 
-                Expires = DateTime.UtcNow.AddDays(1)
-            };
-
-            Response.Cookies.Append(
-               "car_app_token",
-               token,
-               cookieOptions);
-
-            return Ok(new { statusCode = 200, message = "user added sucessfully.", data = user.Role });
+            return Ok(new
+            {
+                message = "User created successfully"
+            });
         }
-
-        // READ ALL
+        // 🔐 GET ALL USERS (ADMIN ONLY)
+        [Authorize(Roles = "Admin")]
         [HttpGet]
-        public async Task<IActionResult> GetAllUsers()
+        public async Task<IActionResult> GetAllUsers(CancellationToken ct)
         {
             var users = await _context.Users
-                .Select(x => new UserResponseDto
+                .Select(x => new AdminResponseDto
                 {
                     Id = x.Id,
                     FullName = x.FullName,
                     Email = x.Email,
                     Username = x.Username,
-                    Role=x.Role,
-                    CreatedAt = x.CreatedAt
+                    Role = x.Role,
+                    IsActive = x.IsActive,
+                    CreatedAt = x.CreatedAt,
+                    LastLoginAt = x.LastLoginAt
                 })
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            return Ok(new { statusCode = 200, message = "users retrieved sucessfully.", data = users });
+            return Ok(users);
         }
-
-        // READ BY ID
+        // 🔐 GET USER BY ID
+        [Authorize]
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetUser(int id)
+        public async Task<IActionResult> GetUser(int id, CancellationToken ct)
         {
-            var user = await _context.Users
-                .Where(x => x.Id == id)
-                .Select(x => new UserResponseDto
-                {
-                    Id = x.Id,
-                    FullName = x.FullName,
-                    Email = x.Email,
-                    Username = x.Username,
-                    CreatedAt = x.CreatedAt
-                })
-                .FirstOrDefaultAsync();
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(new { statusCode = 200, message = "user retrieved sucessfully.", data = user });
-        }
-
-        // UPDATE
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(int id,[FromForm] UserUpdateDto dto)
-        {
-            var user =
-                await _context.Users.FindAsync(id);
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            user.FullName = dto.FullName;
-            user.Email = dto.Email;
-            user.Username = dto.Username;
-
-            if (!string.IsNullOrWhiteSpace(dto.Password))
-            {
-                user.PasswordHash =
-                    BCrypt.Net.BCrypt.HashPassword(
-                        dto.Password);
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { statusCode = 200, message = "user updated sucessfully.", data = user.Id });
-        }
-
-        // DELETE
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(int id)
-        {
-            var user =
-                await _context.Users.FindAsync(id);
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            _context.Users.Remove(user);
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { statusCode = 200, message = "user deleted sucessfully.", data = user.Id });
-        }
-
-        //Login
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromForm] LoginDto dto)
-        {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(
-                    x => x.Username == dto.Username);
-
-            if (user == null)
-            {
-                return BadRequest(
-                    new
-                    {
-                        statusCode = 400,
-                        message = "Invalid username"
-                    });
-            }
-
-            bool validPassword =
-                BCrypt.Net.BCrypt.Verify(
-                    dto.Password,
-                    user.PasswordHash);
-
-            if (!validPassword)
-            {
-                return BadRequest(
-                    new
-                    {
-                        statusCode = 400,
-                        message = "Invalid password"
-                    });
-            }
-
-            var token = _tokenService.CreateToken(user.Id, user.Email, user.Username, user.Role, 60 * 24);
-
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = false,
-                SameSite = SameSiteMode.Strict,
-
-                Expires = DateTime.UtcNow.AddDays(1)
-            };
-
-            // SAVE TOKEN IN COOKIE
-            Response.Cookies.Append(
-                "car_app_token",
-                token,
-                cookieOptions);
-
-            return Ok(
-                new
-                {
-                    statusCode = 200,
-                    message = "Login successful",
-                    data = new
-                    {
-                        username= user.Username,
-                        role=user.Role
-                    }
-                });
-        }
-        [HttpPost("CreateOrder/{carId}")]
-        public async Task<IActionResult> CreateOrder(int carId)
-        {
-            var userIdClaim = User.FindFirst("id")?.Value;
-
+            var userIdClaim = User.FindFirst("id");
             if (userIdClaim == null)
                 return Unauthorized();
 
-            int userId = int.Parse(userIdClaim);
+            int userIdFromToken = int.Parse(userIdClaim.Value);
 
-            var car = await _context.Cars.FindAsync(carId);
-
-            if (car == null)
-                return NotFound("Car not found");
-
-            var order = new Order
+            if (userIdFromToken != id && !User.IsInRole("Admin"))
             {
-                UserId = userId,
-                CarId = carId,
-                Price = car.Price
+                return Forbid();
+            }
+            var user = await _context.Users
+                .Where(x => x.Id == id)
+                .Select(x => new UserProfileDto
+                {
+                    FullName = x.FullName,
+                    Email = x.Email,
+                    Username = x.Username
+                })
+                .FirstOrDefaultAsync(ct);
+
+            if (user == null)
+                return NotFound();
+
+            return Ok(user);
+        }
+        [Authorize(Roles = "Admin")]
+        [HttpPut("admin/{id}")]
+        public async Task<IActionResult> AdminUpdateUser(int id, AdminUserUpdateDto dto, CancellationToken ct)
+        {
+            var user = await _context.Users.FindAsync([id], ct);
+
+            if (user == null)
+                return NotFound();
+
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var normalizedEmail = dto.Email.Trim().ToUpper();
+
+                bool exists = await _context.Users.AnyAsync(x =>
+                    x.Id != id && x.NormalizedEmail == normalizedEmail, ct);
+
+                if (exists)
+                    return BadRequest(new { message = "Email already exists" });
+
+                user.Email = dto.Email.Trim();
+                user.NormalizedEmail = normalizedEmail;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Username))
+            {
+                var normalizedUsername = dto.Username.Trim().ToUpper();
+
+                bool exists = await _context.Users.AnyAsync(x =>
+                    x.Id != id && x.NormalizedUsername == normalizedUsername, ct);
+
+                if (exists)
+                    return BadRequest(new { message = "Username already exists" });
+
+                user.Username = dto.Username.Trim();
+                user.NormalizedUsername = normalizedUsername;
+            }
+
+            // Admin can change role
+            user.Role = dto.Role;
+
+            // Admin can activate/deactivate
+            user.IsActive = dto.IsActive;
+
+            // Optional password reset
+            if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                if (dto.Password.Length < 8 ||
+                    !dto.Password.Any(char.IsUpper) ||
+                    !dto.Password.Any(char.IsDigit))
+                {
+                    return BadRequest(new { message = "Weak password" });
+                }
+
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            }
+
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(ct);
+
+            return Ok(new { message = "User updated by admin" });
+        }
+
+        // 🔐 UPDATE USER self
+        [Authorize]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateDto dto, CancellationToken ct)
+        {
+            var userIdClaim = User.FindFirst("id");
+            if (userIdClaim == null)
+                return Unauthorized();
+
+            int userIdFromToken = int.Parse(userIdClaim.Value);
+
+            if (userIdFromToken != id && !User.IsInRole("Admin"))
+                return Forbid();
+
+            var user = await _context.Users.FindAsync([id], ct);
+
+            if (user == null)
+                return NotFound();
+
+            // Normalize only if provided
+            var normalizedEmail = dto.Email?.Trim().ToUpper();
+            var normalizedUsername = dto.Username?.Trim().ToUpper();
+
+            // Check uniqueness only for changed fields
+            bool exists = await _context.Users.AnyAsync(x =>
+                x.Id != id &&
+                (
+                    (normalizedEmail != null && x.NormalizedEmail == normalizedEmail) ||
+                    (normalizedUsername != null && x.NormalizedUsername == normalizedUsername)
+                ), ct);
+
+            if (exists)
+            {
+                return BadRequest(new { message = "Username or Email already exists" });
+            }
+
+            // Update only provided fields
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                user.Email = dto.Email.Trim();
+                user.NormalizedEmail = user.Email.ToUpper();
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Username))
+            {
+                user.Username = dto.Username.Trim();
+                user.NormalizedUsername = user.Username.ToUpper();
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                if (dto.Password.Length < 8 ||
+                    !dto.Password.Any(char.IsUpper) ||
+                    !dto.Password.Any(char.IsDigit))
+                {
+                    return BadRequest(new { message = "Weak password" });
+                }
+
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            }
+
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(ct);
+
+            return Ok(new { message = "User updated" });
+        }
+
+        // 🔐 SOFT DELETE
+        [Authorize]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id, CancellationToken ct)
+        {
+            var userIdClaim = User.FindFirst("id");
+            if (userIdClaim == null)
+                return Unauthorized();
+
+            int userIdFromToken = int.Parse(userIdClaim.Value);
+
+            if (userIdFromToken != id && !User.IsInRole("Admin"))
+            {
+                return Forbid();
+            }
+            var user = await _context.Users.FindAsync([id], ct);
+
+            if (user == null)
+                return NotFound();
+
+            user.IsActive = false;
+
+            Response.Cookies.Delete(AuthCookieName);
+
+            await _context.SaveChangesAsync(ct);
+
+            return Ok(new { message = "User deactivated" });
+        }
+
+        //Login
+        [EnableRateLimiting("loginPolicy")]
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto dto, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalizedUsername = dto.Username.Trim().ToUpper();
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(x => x.NormalizedUsername == normalizedUsername, ct);
+
+            string fakeHash = "$2a$11$7EqJtq98hPqEX7fNZaFWoO7EqJtq98hPqEX7fNZaFWoO7EqJtq98hPq"; 
+
+            if (user == null)
+            {
+                BCrypt.Net.BCrypt.Verify(dto.Password, fakeHash);
+                return BadRequest(new { message = "Invalid credentials" });
+            }
+            if (!user.IsActive)
+            {
+                return BadRequest(new { message = "Invalid credentials" });
+            }
+            if (!user.IsEmailConfirmed)
+            {
+                return BadRequest(new { message = "Please verify your email first" });
+            }
+
+            if (user.LockoutEnd > DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Account locked. Try later." });
+            }
+
+            bool validPassword = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+
+            if (!validPassword)
+            {
+                user.FailedLoginAttempts++;
+
+                if (user.FailedLoginAttempts >= 5)
+                {
+                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
+                    user.FailedLoginAttempts = 0;
+                }
+
+                user.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync(ct);
+
+                return BadRequest(new { message = "Invalid credentials" });
+            }
+            if (user.FailedLoginAttempts != 0)
+            {
+                user.FailedLoginAttempts = 0;
+            }
+
+            user.LockoutEnd = null;
+            user.LastLoginAt = DateTime.UtcNow;
+            user.LastLoginIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(ct);
+
+            var tokenExpiryMinutes = 60 * 24; // move to config later
+
+            var token = _tokenService.CreateToken(
+                user.Id,
+                user.Email,
+                user.Username,
+                user.Role,
+                tokenExpiryMinutes);
+
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                IsEssential = true,
+                Expires = DateTime.UtcNow.AddDays(1)
             };
 
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+            Response.Cookies.Append(AuthCookieName, token, cookieOptions);
 
-            return Ok(new {statusCode=200,message="Order Created Sucessfully.", data=order});
+            return Ok(new
+            {
+                message = "Login successful",
+                data = new
+                {
+                    username = user.Username,
+                    role = user.Role
+                }
+            });
         }
     }
 }

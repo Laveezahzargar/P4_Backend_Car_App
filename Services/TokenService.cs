@@ -20,7 +20,7 @@ namespace P4_Backend_Car_App.Services
         {
             var tokenHandler = new JwtSecurityTokenHandler();   // intializing new instance of  JwtSecurityTokenHandler
 
-            var key = Encoding.ASCII.GetBytes(_secretKey);  /// secret in ascii format 
+            var key = Encoding.UTF8.GetBytes(_secretKey);  /// secret in ascii format 
 
             var payload = new SecurityTokenDescriptor      // creation of payload
             {
@@ -39,48 +39,6 @@ namespace P4_Backend_Car_App.Services
 
             var token = tokenHandler.CreateToken(payload);     // creation of token 
             return tokenHandler.WriteToken(token);        // returning of token 
-        }
-
-        public int VerifyTokenAndGetId(string token)
-        {
-            try
-            {
-                var tokenHandler = new JwtSecurityTokenHandler();
-
-                var key = Encoding.ASCII.GetBytes(_secretKey);
-
-
-                var validationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateLifetime = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key)
-                };
-
-                var validatToken = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
-
-
-                var userId = validatToken.FindFirst(ClaimTypes.NameIdentifier);
-
-                if (userId != null)
-                {
-                    return int.Parse(userId.Value);
-                }
-                else
-                {
-                    throw new Exception("User ID not found in token.");
-                }
-            }
-            catch (SecurityTokenExpiredException)
-            {
-                throw new Exception("Token has expired.");
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Token validation failed: " + ex.Message);
-            }
-
         }
     }
 }

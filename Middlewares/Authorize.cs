@@ -1,29 +1,49 @@
-﻿namespace P4_Backend_Car_App.Middlewares
-{
-    public class Authorize
-    {
-        private readonly RequestDelegate _next;
+﻿//using P4_Backend_Car_App.Interfaces;
+//using P4_Backend_Car_App.Services;
+//using System.Security.Claims;
 
-        public Authorize(RequestDelegate next)
-        {
-            _next = next;
-        }
+//namespace P4_Backend_Car_App.Middlewares
+//{
+//    public class Authorize
+//    {
+//        private readonly RequestDelegate _next;
 
-        public async Task Invoke(HttpContext context)
-        {
-            var role = context.Request.Headers["Role"].ToString();
+//        public Authorize(RequestDelegate next)
+//        {
+//            _next = next;
+//        }
 
-            if (context.Request.Path.StartsWithSegments("/api/admin"))
-            {
-                if (role != "admin")
-                {
-                    context.Response.StatusCode = 403;
-                    await context.Response.WriteAsync("Access Denied");
-                    return;
-                }
-            }
+//        public async Task Invoke(HttpContext context, ITokenService tokenService)
+//        {
+//            var token = context.Request.Cookies["car_app_token"];
 
-            await _next(context);
-        }
-    }
-}
+//            if (!string.IsNullOrEmpty(token))
+//            {
+//                var userId = tokenService.VerifyToken(token);
+
+//                var claims = new List<Claim>
+//        {
+//            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+//        };
+
+//                context.User = new ClaimsPrincipal(
+//                    new ClaimsIdentity(claims, "custom")
+//                );
+//            }
+
+//            // OPTIONAL: admin protection
+//            if (context.Request.Path.StartsWithSegments("/api/admin"))
+//            {
+//                var role = context.User?.FindFirst(ClaimTypes.Role)?.Value;
+
+//                if (role != "Admin")
+//                {
+//                    context.Response.StatusCode = 403;
+//                    await context.Response.WriteAsync("Access Denied");
+//                    return;
+//                }
+//            }
+//            await _next(context);
+//        }
+//    }
+//}

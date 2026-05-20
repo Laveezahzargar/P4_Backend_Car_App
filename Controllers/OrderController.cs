@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
 using P4_Backend_Car_App.Types;
+using Serilog;
 
 namespace P4_Backend_Car_App.Controllers
 {
@@ -15,6 +16,34 @@ namespace P4_Backend_Car_App.Controllers
         public OrderController(AppDbContext context)
         {
             _context=context;
+        }
+        [HttpPost("CreateOrder/{carId}")]
+        public async Task<IActionResult> CreateOrder(int carId)
+        {
+            var userIdClaim = User.FindFirst("id")?.Value;
+
+            if (userIdClaim == null)
+                return Unauthorized();
+
+            int userId = int.Parse(userIdClaim);
+
+            var car = await _context.Cars.FindAsync(carId);
+
+            if (car == null)
+                return NotFound("Car not found");
+            Log.Information($"UserId: {userId}, CarId: {carId}");
+            var order = new Order
+            {
+                UserId = userId,
+                CarId = carId,
+                Price = car.Price
+            };
+
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+            Log.Information("Order saved!");
+
+            return Ok(new { statusCode = 200, message = "Order Created Sucessfully.", data = order });
         }
         [HttpGet]
         public async Task<IActionResult> GetOrders()
