@@ -9,6 +9,7 @@ using P4_Backend_Car_App.Models;
 using P4_Backend_Car_App.Types;
 using Microsoft.AspNetCore.RateLimiting;
 using P4_Backend_Car_App.DTOs.User;
+using P4_Backend_Car_App.DTOs;
 
 
 
@@ -20,12 +21,14 @@ namespace P4_Backend_Car_App.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ITokenService _tokenService;
+        private readonly IMailService _mailService;
         private const string AuthCookieName = "car_app_token";
 
-        public UserController(AppDbContext context,ITokenService tokenService)
+        public UserController(AppDbContext context,ITokenService tokenService, IMailService mailService)
         {
             _context = context;
             _tokenService = tokenService;
+            _mailService = mailService;
         }
 
         // CREATE USER
@@ -60,6 +63,8 @@ namespace P4_Backend_Car_App.Controllers
                 });
             }
 
+            var code = Random.Shared.Next(100000, 999999).ToString();
+
             var user = new User
             {
                 FullName = dto.FullName.Trim(),
@@ -68,7 +73,13 @@ namespace P4_Backend_Car_App.Controllers
                 NormalizedEmail = normalizedEmail,
                 NormalizedUsername = normalizedUsername,
                 Role = Role.Customer,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+
+
+                 // EMAIL VERIFICATION
+                IsEmailConfirmed = false,
+                EmailVerificationCode = code,
+                CodeExpiry = DateTime.UtcNow.AddMinutes(10)
             };
 
             _context.Users.Add(user);
@@ -82,9 +93,17 @@ namespace P4_Backend_Car_App.Controllers
                 return BadRequest(new { message = "Username or Email already exists" });
             }
 
+            // 📧 SEND EMAIL
+            await _mailService.SendEmailAsync(
+                email,
+                "Verify your account",
+                $"Your verification code is: <b>{code}</b>",
+                isHtml: true
+            );
+
             return Ok(new
             {
-                message = "User created successfully"
+                message = "User created. Please verify your email."
             });
         }
         // 🔐 GET ALL USERS (ADMIN ONLY)
@@ -395,6 +414,32 @@ namespace P4_Backend_Car_App.Controllers
                     role = user.Role
                 }
             });
+        }
+        [HttpPost("verify-email")]
+        public async Task<IActionResult> VerifyEmail(VerifyEmailDto dto, CancellationToken ct)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(x => x.Email == dto.Email, ct);
+
+            if (user == null)
+                return BadRequest("User not found");
+
+            if (user.IsEmailConfirmed)
+                return BadRequest("Already verified");
+
+            if (user.EmailVerificationCode != dto.Code ||
+                user.CodeExpiry < DateTime.UtcNow)
+            {
+                return BadRequest("Invalid or expired code");
+            }
+
+            user.IsEmailConfirmed = true;
+            user.EmailVerificationCode = null;
+            user.CodeExpiry = null;
+
+            await _context.SaveChangesAsync(ct);
+
+            return Ok(new { message = "Email verified successfully" });
         }
     }
 }

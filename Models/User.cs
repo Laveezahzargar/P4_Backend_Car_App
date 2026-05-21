@@ -45,6 +45,8 @@ namespace P4_Backend_Car_App.Models
 
         [Required]
         public bool IsEmailConfirmed { get; set; } = false;
+        public string? EmailVerificationCode { get; set; }
+        public DateTime? CodeExpiry { get; set; }
 
         public DateTime? LastLoginAt { get; set; }
 

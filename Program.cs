@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using P4_Backend_Car_App;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Services;
@@ -7,8 +10,6 @@ using Serilog;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -86,6 +87,11 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.Configure<EmailSettings>(
+    builder.Configuration.GetSection("EmailSettings"));
+
+builder.Services.AddScoped<IMailService, EmailService>();
 
 builder.Services.AddScoped<ICloudinaryService>(x =>
     new CloudinaryService(
