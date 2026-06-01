@@ -11,8 +11,8 @@ using P4_Backend_Car_App.Data;
 namespace P4_Backend_Car_App.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260601092018_mig_2")]
-    partial class mig_2
+    [Migration("20260601112759_Mig_1")]
+    partial class Mig_1
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

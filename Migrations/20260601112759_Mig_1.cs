@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace P4_Backend_Car_App.Migrations
 {
     /// <inheritdoc />
-    public partial class mig_1 : Migration
+    public partial class Mig_1 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
