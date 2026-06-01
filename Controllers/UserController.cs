@@ -42,8 +42,8 @@ namespace P4_Backend_Car_App.Controllers
 
             var code = Random.Shared.Next(100000, 999999).ToString();
 
-            var hashedCode = BCrypt.Net.BCrypt.HashPassword(code);
-            _cache.Set($"otp:{email}", hashedCode, TimeSpan.FromMinutes(10));
+           // var hashedCode = BCrypt.Net.BCrypt.HashPassword(code);
+            _cache.Set($"otp:{email}", code, TimeSpan.FromMinutes(10));
 
             await _mailService.SendEmailAsync(
                 dto.Email,

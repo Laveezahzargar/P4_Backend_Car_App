@@ -8,7 +8,7 @@
 
         public string NormalizedName { get; set; } = string.Empty;
 
-        public int CapacityCc { get; set; }   // ✅ better than string
+        public string CapacityCc { get; set; }   // ✅ better than string
 
         public string Description { get; set; } = string.Empty;
 

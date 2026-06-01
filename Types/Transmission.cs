@@ -1,8 +1,7 @@
-﻿namespace P4_Backend_Car_App.Types
+﻿namespace P4_Backend_Car_App.Types;
+
+public enum Transmission
 {
-    public enum Transmission
-    {
-        Manual,
-        Automatic
-    }
+    Manual,
+    Automatic
 }

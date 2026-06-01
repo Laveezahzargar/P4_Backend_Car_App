@@ -1,4 +1,8 @@
-﻿namespace P4_Backend_Car_App.Models
+﻿
+
+using P4_Backend_Car_App.Types;
+
+namespace P4_Backend_Car_App.Models
 {
     public class Car
     {

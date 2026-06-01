@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿
 using Microsoft.AspNetCore.Mvc;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
 using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.DTOs;
-using P4_Backend_Car_App.Services;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Types;
 using Microsoft.AspNetCore.Authorization;
@@ -42,7 +41,7 @@ namespace P4_Backend_Car_App.Controllers
                     Manufacturer = c.Manufacturer.Name,
 
                     EngineCapacityId = c.EngineCapacityId,
-                    EngineCapacity = c.EngineCapacity.Capacity,
+                    EngineCapacity = c.EngineCapacity.CapacityCc,
 
                     FuelType = c.FuelType.ToString(),
                     Transmission = c.Transmission.ToString(),
@@ -74,7 +73,7 @@ namespace P4_Backend_Car_App.Controllers
                    Manufacturer = c.Manufacturer.Name,
 
                    EngineCapacityId = c.EngineCapacityId,
-                   EngineCapacity = c.EngineCapacity.Capacity,
+                   EngineCapacity = c.EngineCapacity.CapacityCc,
 
                    FuelType = c.FuelType.ToString(),        // ✅ FIXED
                    Transmission = c.Transmission.ToString(),

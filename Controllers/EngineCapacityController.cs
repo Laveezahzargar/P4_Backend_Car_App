@@ -31,7 +31,7 @@ namespace P4_Backend_Car_App.Controllers
                     Id = e.Id,
                     Name = e.Name,
                     Description = e.Description,
-                    Capacity = e.Capacity
+                    Capacity = e.CapacityCc
                 }).ToListAsync();
             return Ok(new { statusCode = 200, message = "Engines retrieved successfully", data = data });
         }
@@ -48,7 +48,7 @@ namespace P4_Backend_Car_App.Controllers
                         Id = e.Id,
                         Name = e.Name,
                         Description = e.Description,
-                        Capacity = e.Capacity
+                        Capacity = e.CapacityCc
                     })
                .FirstOrDefaultAsync();
 
@@ -69,7 +69,7 @@ namespace P4_Backend_Car_App.Controllers
             bool exists = await _context.EngineCapacities
            .AnyAsync(x =>
              (x.Name.ToLower() == e.Name.ToLower()
-            || x.Capacity.ToLower() == e.Capacity.ToLower()));
+            || x.CapacityCc.ToLower() == e.Capacity.ToLower()));
 
             if (exists)
             {
@@ -78,7 +78,7 @@ namespace P4_Backend_Car_App.Controllers
             var engine = new EngineCapacity
             {
                 Name = e.Name,
-                Capacity = e.Capacity,
+                CapacityCc = e.Capacity,
                 Description = e.Description
             };
             _context.EngineCapacities.Add(engine);
@@ -103,7 +103,7 @@ namespace P4_Backend_Car_App.Controllers
             bool exists = await _context.EngineCapacities
            .AnyAsync(x =>
              (x.Name.ToLower() == e.Name.ToLower()
-            || x.Capacity.ToLower() == e.Capacity.ToLower())
+            || x.CapacityCc .ToLower() == e.Capacity.ToLower())
             && x.Id != id);
 
             if (exists)
@@ -113,7 +113,7 @@ namespace P4_Backend_Car_App.Controllers
 
             // update fields
             existing.Name = e.Name;
-            existing.Capacity = e.Capacity;
+            existing.CapacityCc = e.Capacity;
             existing.Description = e.Description;
 
             await _context.SaveChangesAsync();

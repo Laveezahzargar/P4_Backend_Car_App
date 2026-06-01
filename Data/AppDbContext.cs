@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System.Runtime.ConstrainedExecution;
+using P4_Backend_Car_App.Types;
 
 using P4_Backend_Car_App.Models;
 
@@ -69,7 +69,6 @@ namespace P4_Backend_Car_App.Data
 
                 entity.HasQueryFilter(c => c.IsActive);
 
-                // Store enums as string (better DB readability)
                 entity.Property(c => c.FuelType)
                     .HasConversion<string>();
 
