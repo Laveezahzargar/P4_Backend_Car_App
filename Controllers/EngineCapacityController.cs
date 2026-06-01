@@ -4,11 +4,13 @@ using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
 using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 namespace P4_Backend_Car_App.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class EngineCapacityController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -19,6 +21,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // GET: api/EngineCapacities
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -34,6 +37,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // GET: api/EngineCapacities/1
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -56,6 +60,7 @@ namespace P4_Backend_Car_App.Controllers
 
         // POST: api/EngineCapacities
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] EngineCreateUpdateDto e)
         {
             e.Name = e.Name.Trim();
@@ -79,10 +84,11 @@ namespace P4_Backend_Car_App.Controllers
             _context.EngineCapacities.Add(engine);
             await _context.SaveChangesAsync();
 
-            return Ok(new { statusCode = 201, message = "Engine Added successfully", data = engine.Id });
+            return Ok(new { statusCode = 200, message = "Engine Added successfully", data = engine.Id });
         }
 
         // PUT: api/EngineCapacities/1
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] EngineCreateUpdateDto e)
         {
@@ -116,6 +122,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // DELETE: api/EngineCapacities/1
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

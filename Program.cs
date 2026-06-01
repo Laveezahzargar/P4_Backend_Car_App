@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using P4_Backend_Car_App;
@@ -87,6 +86,8 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddMemoryCache();
 
 builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));

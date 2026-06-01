@@ -4,11 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using P4_Backend_Car_App.Data;
 using P4_Backend_Car_App.Models;
 using P4_Backend_Car_App.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 namespace P4_Backend_Car_App.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ManufacturerController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -19,6 +21,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // GET: api/manufacturers
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -34,6 +37,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // GET: api/manufacturers/1
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -54,6 +58,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // POST: api/manufacturers
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] ManufacturerCreateUpdateDto m)
         {
@@ -73,10 +78,11 @@ namespace P4_Backend_Car_App.Controllers
             };
             _context.Manufacturers.Add(manufacturer);
             await _context.SaveChangesAsync();
-            return Ok(new { statusCode = 201, message = "Manufacturer added successfully", data = manufacturer.Id });
+            return Ok(new { statusCode = 200, message = "Manufacturer added successfully", data = manufacturer.Id });
         }
 
         // PUT: api/manufacturers/1
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] ManufacturerCreateUpdateDto m)
         {
@@ -106,6 +112,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // DELETE: api/manufacturers/1
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

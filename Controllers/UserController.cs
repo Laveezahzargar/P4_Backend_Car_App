@@ -1,15 +1,17 @@
 
 
+using CloudinaryDotNet;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using P4_Backend_Car_App.Data;
+using P4_Backend_Car_App.DTOs;
+using P4_Backend_Car_App.DTOs.User;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Models;
 using P4_Backend_Car_App.Types;
-using Microsoft.AspNetCore.RateLimiting;
-using P4_Backend_Car_App.DTOs.User;
-using P4_Backend_Car_App.DTOs;
 
 
 
@@ -22,88 +24,101 @@ namespace P4_Backend_Car_App.Controllers
         private readonly AppDbContext _context;
         private readonly ITokenService _tokenService;
         private readonly IMailService _mailService;
+        private readonly IMemoryCache _cache;
         private const string AuthCookieName = "car_app_token";
 
-        public UserController(AppDbContext context,ITokenService tokenService, IMailService mailService)
+        public UserController(AppDbContext context,ITokenService tokenService, IMailService mailService, IMemoryCache cache)
         {
             _context = context;
             _tokenService = tokenService;
             _mailService = mailService;
+            _cache = cache;
         }
-
-        // CREATE USER
         [EnableRateLimiting("registerPolicy")]
-        [HttpPost]
-        public async Task<IActionResult> CreateUser([FromBody] RegisterDto dto, CancellationToken ct)
+        [HttpPost("SendVerificationCode")]
+        public async Task<IActionResult> SendVerificationCode([FromBody] EmailDto dto)
         {
-            ct.ThrowIfCancellationRequested();
+            var email = dto.Email.Trim().ToUpper();
 
-            var username = dto.Username.Trim();
+            var code = Random.Shared.Next(100000, 999999).ToString();
+
+            var hashedCode = BCrypt.Net.BCrypt.HashPassword(code);
+            _cache.Set($"otp:{email}", hashedCode, TimeSpan.FromMinutes(10));
+
+            await _mailService.SendEmailAsync(
+                dto.Email,
+                "Verify your account",
+                $"Your code is: <b>{code}</b>",
+                true
+            );
+
+            return Ok(true);
+        }
+        [EnableRateLimiting("registerPolicy")]
+        [HttpPost("VerifyAndCreate")]
+        public async Task<IActionResult> VerifyAndCreate([FromBody] RegisterDto dto, CancellationToken ct)
+        {
             var email = dto.Email.Trim();
-
-            var normalizedUsername = username.ToUpper();
             var normalizedEmail = email.ToUpper();
 
-            bool exists = await _context.Users.AnyAsync(
-                x => x.NormalizedUsername == normalizedUsername ||
-                     x.NormalizedEmail == normalizedEmail, ct);
+            _cache.TryGetValue($"otp:{normalizedEmail}", out string cachedCode);
+
+            // 🔥 ATTEMPT LIMIT
+            var attemptsKey = $"otp_attempts:{normalizedEmail}";
+            int attempts = _cache.Get<int>(attemptsKey);
+
+            if (attempts >= 5)
+            {
+                return BadRequest(new { message = "Too many attempts. Try again later." });
+            }
+
+            // 🔥 EXPIRED
+            if (string.IsNullOrEmpty(cachedCode))
+            {
+                return BadRequest(new { message = "Code expired" });
+            }
+
+            // 🔥 WRONG CODE
+            if (cachedCode != dto.Code)
+            {
+                _cache.Set(attemptsKey, attempts + 1, TimeSpan.FromMinutes(10));
+                return BadRequest(new { message = "Invalid code" });
+            }
+
+            // 🔥 SUCCESS → RESET ATTEMPTS
+            _cache.Remove(attemptsKey);
+
+            var exists = await _context.Users.AnyAsync(
+                x => x.NormalizedEmail == normalizedEmail, ct);
 
             if (exists)
             {
-                return BadRequest(new { message = "Username or Email already exists" });
+                return BadRequest(new { message = "User already exists" });
             }
-
-            if (dto.Password.Length < 8 ||
-                !dto.Password.Any(char.IsUpper) ||
-                !dto.Password.Any(char.IsDigit))
-            {
-                return BadRequest(new
-                {
-                    message = "Password must be 8+ chars, include uppercase and number"
-                });
-            }
-
-            var code = Random.Shared.Next(100000, 999999).ToString();
 
             var user = new User
             {
                 FullName = dto.FullName.Trim(),
                 Email = email,
-                Username = username,
+                Username = dto.Username.Trim(),
                 NormalizedEmail = normalizedEmail,
-                NormalizedUsername = normalizedUsername,
+                NormalizedUsername = dto.Username.ToUpper(),
                 Role = Role.Customer,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-
-
-                 // EMAIL VERIFICATION
-                IsEmailConfirmed = false,
-                EmailVerificationCode = code,
-                CodeExpiry = DateTime.UtcNow.AddMinutes(10)
+                IsEmailConfirmed = true
             };
 
             _context.Users.Add(user);
+            await _context.SaveChangesAsync(ct);
 
-            try
-            {
-                await _context.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException)
-            {
-                return BadRequest(new { message = "Username or Email already exists" });
-            }
-
-            // 📧 SEND EMAIL
-            await _mailService.SendEmailAsync(
-                email,
-                "Verify your account",
-                $"Your verification code is: <b>{code}</b>",
-                isHtml: true
-            );
+            _cache.Remove($"otp:{normalizedEmail}");
 
             return Ok(new
             {
-                message = "User created. Please verify your email."
+                user.Id,
+                user.Username,
+                user.Email,
+                user.Role
             });
         }
         // 🔐 GET ALL USERS (ADMIN ONLY)
@@ -328,82 +343,87 @@ namespace P4_Backend_Car_App.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto, CancellationToken ct)
         {
-            ct.ThrowIfCancellationRequested();
-            var normalizedUsername = dto.Username.Trim().ToUpper();
 
-            var user = await _context.Users
-                .FirstOrDefaultAsync(x => x.NormalizedUsername == normalizedUsername, ct);
+                ct.ThrowIfCancellationRequested();
+                var normalizedUsername = dto.Username.Trim().ToUpper();
 
-            string fakeHash = "$2a$11$7EqJtq98hPqEX7fNZaFWoO7EqJtq98hPqEX7fNZaFWoO7EqJtq98hPq"; 
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(x => x.NormalizedUsername == normalizedUsername, ct);
 
-            if (user == null)
-            {
-                BCrypt.Net.BCrypt.Verify(dto.Password, fakeHash);
-                return BadRequest(new { message = "Invalid credentials" });
-            }
-            if (!user.IsActive)
-            {
-                return BadRequest(new { message = "Invalid credentials" });
-            }
-            if (!user.IsEmailConfirmed)
-            {
-                return BadRequest(new { message = "Please verify your email first" });
-            }
+                string fakeHash = "$2a$11$7EqJtq98hPqEX7fNZaFWoO7EqJtq98hPqEX7fNZaFWoO7EqJtq98hPq";
+
+                if (user == null)
+                {
+                    BCrypt.Net.BCrypt.Verify(dto.Password, fakeHash);
+                    return BadRequest(new { message = "Invalid credentials" });
+                }
+                if (!user.IsActive)
+                {
+                    return BadRequest(new { message = "Invalid credentials" });
+                }
+                if (!user.IsEmailConfirmed)
+                {
+                    return BadRequest(new
+                    {
+                        message = "EMAIL_NOT_VERIFIED",
+                        email = user.Email
+                    });
+                }
 
             if (user.LockoutEnd > DateTime.UtcNow)
-            {
-                return BadRequest(new { message = "Account locked. Try later." });
-            }
-
-            bool validPassword = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
-
-            if (!validPassword)
-            {
-                user.FailedLoginAttempts++;
-
-                if (user.FailedLoginAttempts >= 5)
                 {
-                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
+                    return BadRequest(new { message = "Account locked. Try later." });
+                }
+
+                bool validPassword = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+
+                if (!validPassword)
+                {
+                    user.FailedLoginAttempts++;
+
+                    if (user.FailedLoginAttempts >= 5)
+                    {
+                        user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
+                        user.FailedLoginAttempts = 0;
+                    }
+
+                    user.UpdatedAt = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync(ct);
+
+                    return BadRequest(new { message = "Invalid credentials" });
+                }
+                if (user.FailedLoginAttempts != 0)
+                {
                     user.FailedLoginAttempts = 0;
                 }
 
+                user.LockoutEnd = null;
+                user.LastLoginAt = DateTime.UtcNow;
+                user.LastLoginIp = HttpContext.Connection.RemoteIpAddress?.ToString();
                 user.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync(ct);
 
-                return BadRequest(new { message = "Invalid credentials" });
-            }
-            if (user.FailedLoginAttempts != 0)
-            {
-                user.FailedLoginAttempts = 0;
-            }
+                var tokenExpiryMinutes = 60 * 24; // move to config later
 
-            user.LockoutEnd = null;
-            user.LastLoginAt = DateTime.UtcNow;
-            user.LastLoginIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-            user.UpdatedAt = DateTime.UtcNow;
+                var token = _tokenService.CreateToken(
+                    user.Id,
+                    user.Email,
+                    user.Username,
+                    user.Role,
+                    tokenExpiryMinutes);
 
-            await _context.SaveChangesAsync(ct);
+                var cookieOptions = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    IsEssential = true,
+                    Expires = DateTime.UtcNow.AddDays(1)
+                };
 
-            var tokenExpiryMinutes = 60 * 24; // move to config later
-
-            var token = _tokenService.CreateToken(
-                user.Id,
-                user.Email,
-                user.Username,
-                user.Role,
-                tokenExpiryMinutes);
-
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
-                IsEssential = true,
-                Expires = DateTime.UtcNow.AddDays(1)
-            };
-
-            Response.Cookies.Append(AuthCookieName, token, cookieOptions);
+                Response.Cookies.Append(AuthCookieName, token, cookieOptions);
 
             return Ok(new
             {
@@ -411,35 +431,58 @@ namespace P4_Backend_Car_App.Controllers
                 data = new
                 {
                     username = user.Username,
+                    email = user.Email,
                     role = user.Role
                 }
             });
         }
-        [HttpPost("verify-email")]
-        public async Task<IActionResult> VerifyEmail(VerifyEmailDto dto, CancellationToken ct)
+        [HttpPost("VerifyLoginOtp")]
+        public async Task<IActionResult> VerifyLoginOtp([FromBody] VerifyOtpDto dto)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(x => x.Email == dto.Email, ct);
+            var email = dto.Email.Trim().ToUpper();
 
-            if (user == null)
-                return BadRequest("User not found");
+            _cache.TryGetValue($"otp:{email}", out string cachedCode);
 
-            if (user.IsEmailConfirmed)
-                return BadRequest("Already verified");
+            var attemptsKey = $"otp_attempts:{email}";
+            int attempts = _cache.Get<int>(attemptsKey);
 
-            if (user.EmailVerificationCode != dto.Code ||
-                user.CodeExpiry < DateTime.UtcNow)
+            if (attempts >= 5)
             {
-                return BadRequest("Invalid or expired code");
+                return BadRequest(new { message = "Too many attempts. Try again later." });
             }
 
+            if (string.IsNullOrEmpty(cachedCode))
+            {
+                _cache.Remove(attemptsKey);
+                return BadRequest(new { message = "Code expired" });
+            }
+
+            if (cachedCode != dto.Code)
+            {
+                _cache.Set(attemptsKey, attempts + 1, TimeSpan.FromMinutes(10));
+                return BadRequest(new { message = "Invalid code" });
+            }
+
+            // ✅ SUCCESS
+            _cache.Remove(attemptsKey);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(x => x.NormalizedEmail == email);
+
+            if (user == null)
+                return BadRequest(new { message = "User not found" });
+
             user.IsEmailConfirmed = true;
-            user.EmailVerificationCode = null;
-            user.CodeExpiry = null;
 
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Email verified successfully" });
+            _cache.Remove($"otp:{email}");
+
+            return Ok(new
+            {
+                username = user.Username,
+                role = user.Role
+            });
         }
     }
 }

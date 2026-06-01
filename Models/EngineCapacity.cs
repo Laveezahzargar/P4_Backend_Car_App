@@ -6,10 +6,18 @@
 
         public string Name { get; set; } = string.Empty;
 
-        public string Capacity { get; set; } = string.Empty;
+        public string NormalizedName { get; set; } = string.Empty;
+
+        public int CapacityCc { get; set; }   // ✅ better than string
 
         public string Description { get; set; } = string.Empty;
 
-        public List<Car> Cars { get; set; } = new List<Car>();
+        public bool IsActive { get; set; } = true;
+
+        public DateTime CreatedAt { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
+
+        public List<Car> Cars { get; set; } = new();
     }
 }

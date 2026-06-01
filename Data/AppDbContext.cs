@@ -31,6 +31,62 @@ namespace P4_Backend_Car_App.Data
                 
                 entity.HasQueryFilter(u => u.IsActive);
             });
+
+            modelBuilder.Entity<Manufacturer>(entity =>
+            {
+                entity.HasIndex(m => m.NormalizedName).IsUnique();
+
+                entity.Property(m => m.NormalizedName)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.HasQueryFilter(m => m.IsActive);
+            });
+
+            modelBuilder.Entity<EngineCapacity>(entity =>
+            {
+                entity.HasIndex(e => e.NormalizedName).IsUnique();
+
+                entity.Property(e => e.NormalizedName)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.HasQueryFilter(e => e.IsActive);
+            });
+
+            modelBuilder.Entity<Car>(entity =>
+            {
+                entity.Property(c => c.Name)
+                    .IsRequired()
+                    .HasMaxLength(150);
+
+                entity.Property(c => c.Price)
+                    .HasColumnType("decimal(18,2)");
+
+                entity.HasQueryFilter(c => c.IsActive);
+
+                // Store enums as string (better DB readability)
+                entity.Property(c => c.FuelType)
+                    .HasConversion<string>();
+
+                entity.Property(c => c.Transmission)
+                    .HasConversion<string>();
+
+                // Relationships
+                entity.HasOne(c => c.Manufacturer)
+                    .WithMany(m => m.Cars)
+                    .HasForeignKey(c => c.ManufacturerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(c => c.EngineCapacity)
+                    .WithMany(e => e.Cars)
+                    .HasForeignKey(c => c.EngineCapacityId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
         }
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -48,6 +104,52 @@ namespace P4_Backend_Car_App.Data
                     entry.Property(x => x.CreatedAt).IsModified = false;
                 }
             }
+
+            foreach (var entry in ChangeTracker.Entries<Manufacturer>())
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                    entry.Entity.NormalizedName = entry.Entity.Name.ToUpper() ?? string.Empty;
+                }
+
+                if (entry.State == EntityState.Modified)
+                {
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    entry.Entity.NormalizedName = entry.Entity.Name?.ToUpper() ?? string.Empty;
+                }
+            }
+
+            foreach (var entry in ChangeTracker.Entries<EngineCapacity>())
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                    entry.Entity.NormalizedName =
+                        entry.Entity.Name?.ToUpper() ?? string.Empty;
+                }
+
+                if (entry.State == EntityState.Modified)
+                {
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    entry.Entity.NormalizedName =
+                        entry.Entity.Name?.ToUpper() ?? string.Empty;
+                }
+            }
+
+            foreach (var entry in ChangeTracker.Entries<Car>())
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                }
+
+                if (entry.State == EntityState.Modified)
+                {
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
 
             return base.SaveChangesAsync(cancellationToken);
         }

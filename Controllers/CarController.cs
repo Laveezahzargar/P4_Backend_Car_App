@@ -7,11 +7,13 @@ using P4_Backend_Car_App.DTOs;
 using P4_Backend_Car_App.Services;
 using P4_Backend_Car_App.Interfaces;
 using P4_Backend_Car_App.Types;
+using Microsoft.AspNetCore.Authorization;
 
 namespace P4_Backend_Car_App.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class CarController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -24,6 +26,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // GET: api/Cars
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -54,6 +57,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // GET: api/Cars/1
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -89,9 +93,13 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // POST: api/Cars
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> Create([FromForm] CarCreateWithImageDto car)
         {
+            if (string.IsNullOrWhiteSpace(car.Name))
+                return BadRequest("Car name is required");
+
             car.Name = car.Name.Trim();
 
             // validate foreign keys
@@ -125,8 +133,8 @@ namespace P4_Backend_Car_App.Controllers
                 ManufacturerId = car.ManufacturerId,
                 EngineCapacityId = car.EngineCapacityId,
 
-                FuelType = Enum.Parse<FuelType>(car.FuelType),
-                Transmission = Enum.Parse<Transmission>(car.Transmission),
+                FuelType = Enum.Parse<FuelType>(car.FuelType, true),
+                Transmission = Enum.Parse<Transmission>(car.Transmission, true),
 
                 Price = car.Price,
                 Year = car.Year,
@@ -141,15 +149,16 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // PUT: api/Cars/1
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromForm] CarCreateUpdateDto car)
         {
+            car.Name = car.Name.Trim();
+
             var existing = await _context.Cars.FindAsync(id);
 
             if (existing == null)
                 return NotFound();
-
-            car.Name = car.Name.Trim();
 
             bool exists = await _context.Cars.AnyAsync(c =>
             c.Name.ToLower() == car.Name.ToLower()
@@ -185,6 +194,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         // DELETE: api/Cars/1
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -200,6 +210,7 @@ namespace P4_Backend_Car_App.Controllers
         }
 
         //upload image for a car
+        [Authorize(Roles = "Admin")]
         [HttpPost("upload")]
         public async Task<IActionResult> UploadImage([FromForm]IFormFile file)
         {

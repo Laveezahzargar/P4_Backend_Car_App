@@ -22,5 +22,7 @@ namespace P4_Backend_Car_App.DTOs.User
             [Required]
             [MinLength(8)]
             public string Password { get; set; }
+
+            public string Code { get; set; } = string.Empty;
     }
 }
