@@ -183,7 +183,7 @@ namespace P4_Backend_Car_App.Controllers
             if (user == null)
                 return NotFound();
 
-            return Ok(user);
+            return Ok(new { statusCode = 200, message = "User retrieved sucessfully ", data = user });
         }
         [Authorize(Roles = "Admin")]
         [HttpPut("admin/{id}")]
@@ -248,7 +248,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync(ct);
 
-            return Ok(new { message = "User updated by admin" });
+            return Ok(new { statusCode = 200, message = "User updated by admin", data= user.Id });
         }
 
         // 🔐 UPDATE USER self
@@ -319,7 +319,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync(ct);
 
-            return Ok(new { message = "User updated" });
+            return Ok(new {StatusCode=200, message = "User updated", data= user.Id });
         }
 
         // 🔐 SOFT DELETE
@@ -348,7 +348,7 @@ namespace P4_Backend_Car_App.Controllers
 
             await _context.SaveChangesAsync(ct);
 
-            return Ok(new { message = "User deactivated" });
+            return Ok(new { statusCode = 200, message = "User deactivated", data=user.Id });
         }
 
         //Login
