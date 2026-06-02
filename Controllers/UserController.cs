@@ -25,7 +25,6 @@ namespace P4_Backend_Car_App.Controllers
         private readonly ITokenService _tokenService;
         private readonly IMailService _mailService;
         private readonly IMemoryCache _cache;
-        private const string AuthCookieName = "car_app_token";
 
         public UserController(AppDbContext context,ITokenService tokenService, IMailService mailService, IMemoryCache cache)
         {
@@ -111,14 +110,28 @@ namespace P4_Backend_Car_App.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync(ct);
 
+            var tokenExpiryMinutes = 60 * 24;
+
+            var token = _tokenService.CreateToken(
+                user.Id,
+                user.Email,
+                user.Username,
+                user.Role,
+                tokenExpiryMinutes);
+
             _cache.Remove($"otp:{normalizedEmail}");
 
             return Ok(new
             {
-                user.Id,
-                user.Username,
-                user.Email,
-                user.Role
+                message = "Registration successful",
+                token = token,
+                data = new
+                {
+                    user.Id,
+                    user.Username,
+                    user.Email,
+                    user.Role
+                }
             });
         }
         // 🔐 GET ALL USERS (ADMIN ONLY)
@@ -140,7 +153,7 @@ namespace P4_Backend_Car_App.Controllers
                 })
                 .ToListAsync(ct);
 
-            return Ok(users);
+            return Ok(new { statusCode = 200, message = "Users retrieved sucessfully ", data = users });
         }
         // 🔐 GET USER BY ID
         [Authorize]
@@ -331,7 +344,7 @@ namespace P4_Backend_Car_App.Controllers
 
             user.IsActive = false;
 
-            Response.Cookies.Delete(AuthCookieName);
+   
 
             await _context.SaveChangesAsync(ct);
 
@@ -414,20 +427,10 @@ namespace P4_Backend_Car_App.Controllers
                     user.Role,
                     tokenExpiryMinutes);
 
-                var cookieOptions = new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Strict,
-                    IsEssential = true,
-                    Expires = DateTime.UtcNow.AddDays(1)
-                };
-
-                Response.Cookies.Append(AuthCookieName, token, cookieOptions);
-
             return Ok(new
             {
                 message = "Login successful",
+                token = token,
                 data = new
                 {
                     username = user.Username,
